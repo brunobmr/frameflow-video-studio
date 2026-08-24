@@ -1,0 +1,11 @@
+.env.local
+
+# Local video-processing outputs and temporary files
+outputs/
+*.tmp
+
+# Next.js and package manager
+.next/
+node_modules/
+.vercel/
+*.tsbuildinfo
