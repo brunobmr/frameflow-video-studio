@@ -14,8 +14,9 @@ import {
   Sparkles,
   UploadCloud,
 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { approvedLofiSettings, buildRenderJobs, type RenderJob } from "@/lib/editor";
+import { renderVideoVariant } from "@/lib/render-browser";
 import { PhraseEditor } from "./phrase-editor";
 import { RenderQueue } from "./render-queue";
 import { VideoCanvas } from "./video-canvas";
@@ -28,6 +29,8 @@ export function EditorStudio() {
   const [activePhraseIndex, setActivePhraseIndex] = useState(0);
   const [captions, setCaptions] = useState(approvedLofiSettings.captions);
   const [jobs, setJobs] = useState<RenderJob[]>([]);
+  const [isRendering, setIsRendering] = useState(false);
+  const outputUrls = useRef<string[]>([]);
   const selectedFile = files[0] ?? null;
   const activePhrase = phrases[activePhraseIndex] ?? "";
   const videoUrl = useMemo(
@@ -41,6 +44,10 @@ export function EditorStudio() {
     };
   }, [videoUrl]);
 
+  useEffect(() => () => {
+    outputUrls.current.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
+
   const versionCount = useMemo(
     () => files.length * phrases.filter((phrase) => phrase.trim()).length,
     [files, phrases],
@@ -52,9 +59,32 @@ export function EditorStudio() {
     setJobs([]);
   }
 
-  function prepareVersions() {
+  async function prepareVersions() {
     const nextJobs = buildRenderJobs(files, phrases);
     setJobs(nextJobs.map((job) => ({ ...job, status: "queued" })));
+    setIsRendering(true);
+    for (const job of nextJobs) {
+      setJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "rendering", progress: 0 } : item));
+      try {
+        const blob = await renderVideoVariant(files[job.fileIndex], job.phrase, (progress) => {
+          setJobs((current) => current.map((item) => item.id === job.id ? { ...item, progress } : item));
+        });
+        const outputUrl = URL.createObjectURL(blob);
+        outputUrls.current.push(outputUrl);
+        const baseName = job.fileName.replace(/\.[^.]+$/, "");
+        setJobs((current) => current.map((item) => item.id === job.id ? {
+          ...item,
+          status: "done",
+          progress: 100,
+          outputUrl,
+          outputName: `${baseName}-versao-${job.phraseIndex + 1}.webm`,
+        } : item));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha inesperada durante a renderização.";
+        setJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "error", error: message } : item));
+      }
+    }
+    setIsRendering(false);
   }
 
   return (
@@ -90,8 +120,8 @@ export function EditorStudio() {
           <div className="sidebar-note">
             <Cloud size={19} />
             <div>
-              <strong>Preparado para nuvem</strong>
-              <p>Projetos, mídias e renders poderão ser sincronizados com Supabase.</p>
+              <strong>Render local e privado</strong>
+              <p>O vídeo é processado no seu navegador sem ser enviado para terceiros.</p>
             </div>
           </div>
         </aside>
@@ -170,7 +200,7 @@ export function EditorStudio() {
 
             <div className="setting-list">
               <label className="toggle-row">
-                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Português · duas linhas · contorno preto</small></span></div>
+                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Prévia somente · ainda não incluída no download</small></span></div>
                 <input type="checkbox" checked={captions} onChange={(event) => setCaptions(event.target.checked)} />
               </label>
               <div className="setting-row">
@@ -189,8 +219,8 @@ export function EditorStudio() {
               <strong>{versionCount || 0} {versionCount === 1 ? "versão planejada" : "versões planejadas"}</strong>
               <span>{files.length || 0} vídeo{files.length === 1 ? "" : "s"} × {phrases.filter((phrase) => phrase.trim()).length} frase{phrases.filter((phrase) => phrase.trim()).length === 1 ? "" : "s"}</span>
             </div>
-            <button className="primary-button" disabled={!versionCount} onClick={prepareVersions}>
-              <Sparkles size={18} /> Preparar versões
+            <button className="primary-button" disabled={!versionCount || isRendering} onClick={prepareVersions}>
+              <Sparkles size={18} /> {isRendering ? "Gerando…" : "Gerar versões"}
             </button>
           </div>
         </section>

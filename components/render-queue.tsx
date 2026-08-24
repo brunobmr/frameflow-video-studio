@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock3, Layers3 } from "lucide-react";
+import { AlertCircle, Clock3, Download, Layers3, LoaderCircle } from "lucide-react";
 import type { RenderJob } from "@/lib/editor";
 
 export function RenderQueue({ jobs }: { jobs: RenderJob[] }) {
@@ -21,7 +21,17 @@ export function RenderQueue({ jobs }: { jobs: RenderJob[] }) {
           <div className="queue-item" key={job.id}>
             <span className="queue-index">{String(index + 1).padStart(2, "0")}</span>
             <div><strong>{job.phrase}</strong><small>{job.fileName}</small></div>
-            <span className="queue-status"><CheckCircle2 size={14} /> pronta para render</span>
+            {job.status === "done" && job.outputUrl ? (
+              <a className="queue-download" href={job.outputUrl} download={job.outputName}>
+                <Download size={14} /> Baixar
+              </a>
+            ) : job.status === "error" ? (
+              <span className="queue-status is-error" title={job.error}><AlertCircle size={14} /> falhou</span>
+            ) : job.status === "rendering" ? (
+              <span className="queue-status"><LoaderCircle className="spin" size={14} /> {job.progress ?? 0}%</span>
+            ) : (
+              <span className="queue-status"><Clock3 size={14} /> aguardando</span>
+            )}
           </div>
         ))}
       </div>

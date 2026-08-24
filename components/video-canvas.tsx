@@ -32,7 +32,7 @@ export function VideoCanvas({ videoUrl, phrase, captions }: VideoCanvasProps) {
 
         {!videoUrl && <button className="center-play" aria-label="Aguardar vídeo"><Play size={22} fill="currentColor" /></button>}
       </div>
-      <div className="canvas-meta"><span>1080 × 1920</span><span>30 FPS</span><span>H.264</span></div>
+      <div className="canvas-meta"><span>1080 × 1920</span><span>30 FPS</span><span>WebM</span></div>
     </div>
   );
 }

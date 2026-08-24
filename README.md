@@ -14,6 +14,8 @@ O estúdio visual já permite:
 - ativar/desativar a prévia das legendas;
 - preservar os padrões validados no teste local;
 - gerar a matriz de jobs: `vídeos × frases`.
+- renderizar as variações no próprio navegador em 1080 × 1920;
+- preservar o áudio original e baixar cada resultado em WebM.
 
 Padrão inicial:
 
@@ -85,7 +87,7 @@ docs/                decisões, testes e arquitetura
 1. conectar um projeto Supabase real;
 2. implementar login e persistência de projetos;
 3. enviar arquivos diretamente ao Storage;
-4. criar transcrição online e editor de legendas;
+4. criar transcrição online e incluir legendas no arquivo exportado;
 5. publicar o worker FFmpeg e acompanhar progresso;
 6. ativar downloads por URLs assinadas;
 7. publicar previews pela integração GitHub–Vercel.

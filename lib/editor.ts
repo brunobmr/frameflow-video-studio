@@ -20,9 +20,15 @@ export const approvedLofiSettings: EditorSettings = {
 
 export type RenderJob = {
   id: string;
+  fileIndex: number;
+  phraseIndex: number;
   fileName: string;
   phrase: string;
-  status: "ready" | "queued" | "rendering" | "done";
+  status: "ready" | "queued" | "rendering" | "done" | "error";
+  progress?: number;
+  outputUrl?: string;
+  outputName?: string;
+  error?: string;
 };
 
 export function buildRenderJobs(files: File[], phrases: string[]): RenderJob[] {
@@ -32,6 +38,8 @@ export function buildRenderJobs(files: File[], phrases: string[]): RenderJob[] {
       .filter(Boolean)
       .map((phrase, phraseIndex) => ({
         id: `${file.name}-${fileIndex}-${phraseIndex}`,
+        fileIndex,
+        phraseIndex,
         fileName: file.name,
         phrase,
         status: "ready" as const,

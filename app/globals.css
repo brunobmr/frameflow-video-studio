@@ -152,6 +152,11 @@ button { color: inherit; }
 .queue-item strong { font-size: 10px; }
 .queue-item small { color: var(--muted); font-size: 8px; margin-top: 2px; }
 .queue-status { display: flex; align-items: center; gap: 4px; color: var(--green); font-size: 8px; white-space: nowrap; }
+.queue-status.is-error { color: #c33b3b; }
+.queue-download { align-items: center; background: #e9fff4; border: 1px solid #a9e9cb; border-radius: 999px; color: #087447; display: inline-flex; font-size: 9px; font-weight: 750; gap: 4px; padding: 6px 8px; text-decoration: none; }
+.queue-download:hover { background: #d9f9e9; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .error-page { min-height: 100vh; display: grid; place-items: center; background: var(--canvas); padding: 30px; }
 .error-card { max-width: 430px; background: white; border: 1px solid var(--line); border-radius: 20px; padding: 30px; box-shadow: var(--shadow); }
 .error-card h1 { letter-spacing: -.04em; }
