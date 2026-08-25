@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { approvedLofiSettings, buildRenderJobs, type RenderJob } from "@/lib/editor";
-import { renderVideoVariant, type CaptionCue, type PauseRange } from "@/lib/render-browser";
+import { extractAudioForTranscription, renderVideoVariant, type CaptionCue, type PauseRange } from "@/lib/render-browser";
 import { PhraseEditor } from "./phrase-editor";
 import { RenderQueue } from "./render-queue";
 import { VideoCanvas } from "./video-canvas";
@@ -33,7 +33,7 @@ export function EditorStudio() {
   const [preserveAudio, setPreserveAudio] = useState(true);
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [isRendering, setIsRendering] = useState(false);
-  const [renderStage, setRenderStage] = useState<"idle" | "transcribing" | "rendering">("idle");
+  const [renderStage, setRenderStage] = useState<"idle" | "extracting" | "transcribing" | "rendering">("idle");
   const [showHelp, setShowHelp] = useState(false);
   const outputUrls = useRef<string[]>([]);
   const selectedFile = files[0] ?? null;
@@ -79,8 +79,13 @@ export function EditorStudio() {
       setRenderStage("transcribing");
       try {
         for (const fileIndex of [...new Set(nextJobs.map((job) => job.fileIndex))]) {
+          setRenderStage("extracting");
+          const audio = await extractAudioForTranscription(files[fileIndex], (progress) => {
+            setJobs((current) => current.map((item) => item.fileIndex === fileIndex ? { ...item, progress } : item));
+          });
+          setRenderStage("transcribing");
           const body = new FormData();
-          body.append("file", files[fileIndex]);
+          body.append("file", audio, `${files[fileIndex].name.replace(/\.[^.]+$/, "")}-audio.webm`);
           const response = await fetch("/api/transcribe", { method: "POST", body });
           const data = await response.json() as TranscriptData & { error?: string };
           if (!response.ok) throw new Error(data.error ?? "Não foi possível gerar as legendas.");
@@ -254,7 +259,7 @@ export function EditorStudio() {
               <span>{files.length || 0} vídeo{files.length === 1 ? "" : "s"} × {phrases.filter((phrase) => phrase.trim()).length} frase{phrases.filter((phrase) => phrase.trim()).length === 1 ? "" : "s"}</span>
             </div>
             <button className="primary-button" disabled={!versionCount || isRendering} onClick={prepareVersions}>
-              <Sparkles size={18} /> {renderStage === "transcribing" ? "Gerando legendas…" : renderStage === "rendering" ? "Renderizando…" : "Gerar versões"}
+              <Sparkles size={18} /> {renderStage === "extracting" ? "Preparando áudio…" : renderStage === "transcribing" ? "Gerando legendas…" : renderStage === "rendering" ? "Renderizando…" : "Gerar versões"}
             </button>
           </div>
         </section>

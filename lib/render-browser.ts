@@ -107,6 +107,49 @@ function supportedMimeType() {
     .find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
+export async function extractAudioForTranscription(file: File, onProgress: (progress: number) => void) {
+  const video = document.createElement("video") as CapturableVideo;
+  const sourceUrl = URL.createObjectURL(file);
+  video.src = sourceUrl;
+  video.preload = "auto";
+  video.playsInline = true;
+  video.muted = true;
+  try {
+    await waitForEvent(video, "loadedmetadata");
+    const capture = video.captureStream ?? video.mozCaptureStream;
+    if (!capture) throw new Error("Use Chrome ou Edge atualizado para preparar as legendas.");
+    await video.play();
+    const audioTracks = capture.call(video).getAudioTracks();
+    if (!audioTracks.length) throw new Error("O vídeo não possui uma faixa de áudio reconhecível.");
+    const audioStream = new MediaStream(audioTracks);
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+    const recorder = new MediaRecorder(audioStream, { mimeType, audioBitsPerSecond: 64_000 });
+    const chunks: BlobPart[] = [];
+    recorder.addEventListener("dataavailable", (event) => { if (event.data.size) chunks.push(event.data); });
+    const stopped = new Promise<Blob>((resolve, reject) => {
+      recorder.addEventListener("stop", () => resolve(new Blob(chunks, { type: mimeType })));
+      recorder.addEventListener("error", () => reject(new Error("Não foi possível preparar o áudio para transcrição.")));
+    });
+    const updateProgress = () => {
+      onProgress(Math.min(99, Math.round((video.currentTime / video.duration) * 100) || 0));
+      if (!video.ended) requestAnimationFrame(updateProgress);
+    };
+    recorder.start(1000);
+    updateProgress();
+    await waitForEvent(video, "ended");
+    recorder.stop();
+    const blob = await stopped;
+    audioStream.getTracks().forEach((track) => track.stop());
+    onProgress(100);
+    return blob;
+  } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
 export async function renderVideoVariant(
   file: File,
   phrase: string,
