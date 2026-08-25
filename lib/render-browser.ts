@@ -5,6 +5,14 @@ type CapturableVideo = HTMLVideoElement & {
   mozCaptureStream?: () => MediaStream;
 };
 
+export type CaptionCue = { start: number; end: number; text: string };
+export type PauseRange = { start: number; end: number };
+export type RenderOptions = {
+  captions: CaptionCue[];
+  pauses: PauseRange[];
+  preserveAudio: boolean;
+};
+
 function waitForEvent(target: EventTarget, event: string) {
   return new Promise<void>((resolve, reject) => {
     const onEvent = () => { cleanup(); resolve(); };
@@ -31,7 +39,27 @@ function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: num
   return lines;
 }
 
-function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, phrase: string) {
+function drawCaption(context: CanvasRenderingContext2D, cue?: CaptionCue) {
+  if (!cue) return;
+  const { width, height } = context.canvas;
+  context.font = "700 50px Arial, Helvetica, sans-serif";
+  const lines = wrapText(context, cue.text, width - 180).slice(0, 2);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.lineJoin = "round";
+  context.lineWidth = 10;
+  context.strokeStyle = "rgba(0,0,0,.92)";
+  context.fillStyle = "white";
+  const lineHeight = 62;
+  const startY = height - 350 - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, index) => {
+    const y = startY + index * lineHeight;
+    context.strokeText(line, width / 2, y);
+    context.fillText(line, width / 2, y);
+  });
+}
+
+function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, phrase: string, captions: CaptionCue[]) {
   const { width, height } = context.canvas;
   const videoRatio = video.videoWidth / video.videoHeight;
   const canvasRatio = width / height;
@@ -71,6 +99,7 @@ function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, p
   context.textAlign = "center";
   context.textBaseline = "middle";
   lines.forEach((line, index) => context.fillText(line, width / 2, boxY + 17 + lineHeight / 2 + index * lineHeight));
+  drawCaption(context, captions.find((cue) => video.currentTime >= cue.start && video.currentTime <= cue.end));
 }
 
 function supportedMimeType() {
@@ -78,7 +107,12 @@ function supportedMimeType() {
     .find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
-export async function renderVideoVariant(file: File, phrase: string, onProgress: (progress: number) => void) {
+export async function renderVideoVariant(
+  file: File,
+  phrase: string,
+  options: RenderOptions,
+  onProgress: (progress: number) => void,
+) {
   if (typeof MediaRecorder === "undefined") throw new Error("Use Chrome ou Edge atualizado para exportar.");
   const video = document.createElement("video") as CapturableVideo;
   const sourceUrl = URL.createObjectURL(file);
@@ -94,11 +128,13 @@ export async function renderVideoVariant(file: File, phrase: string, onProgress:
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) throw new Error("Não foi possível preparar a renderização.");
     const canvasStream = canvas.captureStream(30);
-    const capture = video.captureStream ?? video.mozCaptureStream;
-    if (!capture) throw new Error("Use Chrome ou Edge atualizado para preservar o áudio.");
     await video.play();
-    const sourceStream = capture.call(video);
-    sourceStream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
+    if (options.preserveAudio) {
+      const capture = video.captureStream ?? video.mozCaptureStream;
+      if (!capture) throw new Error("Use Chrome ou Edge atualizado para preservar o áudio.");
+      const sourceStream = capture.call(video);
+      sourceStream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
+    }
     const mimeType = supportedMimeType();
     const recorder = new MediaRecorder(canvasStream, {
       ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 192_000,
@@ -110,8 +146,15 @@ export async function renderVideoVariant(file: File, phrase: string, onProgress:
       recorder.addEventListener("error", () => reject(new Error("A exportação foi interrompida.")));
     });
     let animationFrame = 0;
+    let isSkipping = false;
     const paint = () => {
-      drawFrame(context, video, phrase);
+      const pause = options.pauses.find((range) => video.currentTime >= range.start && video.currentTime < range.end);
+      if (pause && !isSkipping) {
+        isSkipping = true;
+        video.currentTime = pause.end;
+        video.addEventListener("seeked", () => { isSkipping = false; }, { once: true });
+      }
+      drawFrame(context, video, phrase, options.captions);
       onProgress(Math.min(99, Math.round((video.currentTime / video.duration) * 100) || 0));
       if (!video.ended) animationFrame = requestAnimationFrame(paint);
     };

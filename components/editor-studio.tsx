@@ -16,20 +16,24 @@ import {
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { approvedLofiSettings, buildRenderJobs, type RenderJob } from "@/lib/editor";
-import { renderVideoVariant } from "@/lib/render-browser";
+import { renderVideoVariant, type CaptionCue, type PauseRange } from "@/lib/render-browser";
 import { PhraseEditor } from "./phrase-editor";
 import { RenderQueue } from "./render-queue";
 import { VideoCanvas } from "./video-canvas";
 
 const DEFAULT_PHRASE = "Esse vídeo é pra você petista";
+type TranscriptData = { text: string; cues: CaptionCue[]; pauses: PauseRange[] };
 
 export function EditorStudio() {
   const [files, setFiles] = useState<File[]>([]);
   const [phrases, setPhrases] = useState<string[]>([DEFAULT_PHRASE]);
   const [activePhraseIndex, setActivePhraseIndex] = useState(0);
   const [captions, setCaptions] = useState(approvedLofiSettings.captions);
+  const [cutPauses, setCutPauses] = useState(true);
+  const [preserveAudio, setPreserveAudio] = useState(true);
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [isRendering, setIsRendering] = useState(false);
+  const [renderStage, setRenderStage] = useState<"idle" | "transcribing" | "rendering">("idle");
   const [showHelp, setShowHelp] = useState(false);
   const outputUrls = useRef<string[]>([]);
   const selectedFile = files[0] ?? null;
@@ -69,10 +73,38 @@ export function EditorStudio() {
     const nextJobs = buildRenderJobs(files, phrases);
     setJobs(nextJobs.map((job) => ({ ...job, status: "queued" })));
     setIsRendering(true);
+    const transcripts = new Map<number, TranscriptData>();
+
+    if (captions || cutPauses) {
+      setRenderStage("transcribing");
+      try {
+        for (const fileIndex of [...new Set(nextJobs.map((job) => job.fileIndex))]) {
+          const body = new FormData();
+          body.append("file", files[fileIndex]);
+          const response = await fetch("/api/transcribe", { method: "POST", body });
+          const data = await response.json() as TranscriptData & { error?: string };
+          if (!response.ok) throw new Error(data.error ?? "Não foi possível gerar as legendas.");
+          transcripts.set(fileIndex, data);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha na transcrição.";
+        setJobs((current) => current.map((item) => ({ ...item, status: "error", error: message })));
+        setIsRendering(false);
+        setRenderStage("idle");
+        return;
+      }
+    }
+
+    setRenderStage("rendering");
     for (const job of nextJobs) {
       setJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "rendering", progress: 0 } : item));
       try {
-        const blob = await renderVideoVariant(files[job.fileIndex], job.phrase, (progress) => {
+        const transcript = transcripts.get(job.fileIndex);
+        const blob = await renderVideoVariant(files[job.fileIndex], job.phrase, {
+          captions: captions ? transcript?.cues ?? [] : [],
+          pauses: cutPauses ? transcript?.pauses ?? [] : [],
+          preserveAudio,
+        }, (progress) => {
           setJobs((current) => current.map((item) => item.id === job.id ? { ...item, progress } : item));
         });
         const outputUrl = URL.createObjectURL(blob);
@@ -91,6 +123,7 @@ export function EditorStudio() {
       }
     }
     setIsRendering(false);
+    setRenderStage("idle");
   }
 
   return (
@@ -201,17 +234,17 @@ export function EditorStudio() {
 
             <div className="setting-list">
               <label className="toggle-row">
-                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Prévia somente · ainda não incluída no download</small></span></div>
+                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Português · duas linhas · incluídas no download</small></span></div>
                 <input type="checkbox" checked={captions} onChange={(event) => setCaptions(event.target.checked)} />
               </label>
-              <div className="setting-row">
-                <div><Settings2 size={18} /><span><strong>Pausas e respirações</strong><small>Somente sugestões acima do limite</small></span></div>
-                <span className="value-chip">acima de 0,5 s</span>
-              </div>
-              <div className="setting-row">
-                <div><Film size={18} /><span><strong>Áudio</strong><small>Sem trilha adicional</small></span></div>
-                <span className="value-chip">original</span>
-              </div>
+              <label className="toggle-row">
+                <div><Settings2 size={18} /><span><strong>Cortar pausas e respirações</strong><small>Remove intervalos detectados acima de 0,5 s</small></span></div>
+                <input type="checkbox" checked={cutPauses} onChange={(event) => setCutPauses(event.target.checked)} />
+              </label>
+              <label className="toggle-row">
+                <div><Film size={18} /><span><strong>Manter áudio original</strong><small>Sem música ou trilha adicional</small></span></div>
+                <input type="checkbox" checked={preserveAudio} onChange={(event) => setPreserveAudio(event.target.checked)} />
+              </label>
             </div>
           </section>
 
@@ -221,7 +254,7 @@ export function EditorStudio() {
               <span>{files.length || 0} vídeo{files.length === 1 ? "" : "s"} × {phrases.filter((phrase) => phrase.trim()).length} frase{phrases.filter((phrase) => phrase.trim()).length === 1 ? "" : "s"}</span>
             </div>
             <button className="primary-button" disabled={!versionCount || isRendering} onClick={prepareVersions}>
-              <Sparkles size={18} /> {isRendering ? "Gerando…" : "Gerar versões"}
+              <Sparkles size={18} /> {renderStage === "transcribing" ? "Gerando legendas…" : renderStage === "rendering" ? "Renderizando…" : "Gerar versões"}
             </button>
           </div>
         </section>

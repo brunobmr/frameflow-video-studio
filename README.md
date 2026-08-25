@@ -16,6 +16,9 @@ O estúdio visual já permite:
 - gerar a matriz de jobs: `vídeos × frases`.
 - renderizar as variações no próprio navegador em 1080 × 1920;
 - preservar o áudio original e baixar cada resultado em WebM.
+- transcrever em português e gravar legendas de até duas linhas;
+- detectar e remover pausas superiores a 0,5 segundo;
+- permitir exportação com ou sem o áudio original.
 
 Padrão inicial:
 
@@ -87,7 +90,7 @@ docs/                decisões, testes e arquitetura
 1. conectar um projeto Supabase real;
 2. implementar login e persistência de projetos;
 3. enviar arquivos diretamente ao Storage;
-4. criar transcrição online e incluir legendas no arquivo exportado;
+4. criar editor manual para revisar os timestamps das legendas;
 5. publicar o worker FFmpeg e acompanhar progresso;
 6. ativar downloads por URLs assinadas;
 7. publicar previews pela integração GitHub–Vercel.
