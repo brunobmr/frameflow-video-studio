@@ -80,7 +80,7 @@ function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, p
   let fontSize = approvedLofiSettings.headlineFontSize;
   let lines: string[] = [];
   do {
-    context.font = `700 ${fontSize}px Arial, Helvetica, sans-serif`;
+    context.font = `700 ${fontSize}px "Helvetica Neue", Arial, Helvetica, sans-serif`;
     lines = wrapText(context, phrase, maxTextWidth - 56);
     if (lines.length > 3) fontSize -= 2;
   } while (lines.length > 3 && fontSize > 38);
@@ -93,7 +93,7 @@ function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, p
   const boxY = approvedLofiSettings.headlineY - boxHeight / 2;
   context.fillStyle = "rgba(255,255,255,0.96)";
   context.beginPath();
-  context.roundRect(boxX, boxY, boxWidth, boxHeight, 18);
+  context.roundRect(boxX, boxY, boxWidth, boxHeight, 24);
   context.fill();
   context.fillStyle = "#0a0a0a";
   context.textAlign = "center";
