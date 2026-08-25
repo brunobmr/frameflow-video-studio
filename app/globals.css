@@ -81,7 +81,7 @@ button { color: inherit; }
 .section-helper { color: var(--muted); font-size: 11px; margin: -8px 0 13px 31px; }
 .text-button { display: flex; align-items: center; gap: 5px; color: var(--accent-text); font-size: 11px; font-weight: 750; }
 .phrase-list { display: grid; gap: 8px; }
-.phrase-row { display: grid; grid-template-columns: 34px 1fr 30px 30px; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 12px; }
+.phrase-row { display: grid; grid-template-columns: 34px 1fr 30px 30px 30px; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 12px; }
 .phrase-row.is-active { border-color: #f1a18d; box-shadow: 0 0 0 2px #fff1ec; }
 .version-index { border: 0; border-radius: 8px; height: 34px; background: #f2f4f1; color: var(--muted); font: 750 10px var(--font-geist-mono), monospace; cursor: pointer; }
 .phrase-row.is-active .version-index { background: var(--accent-text); color: white; }
@@ -157,6 +157,12 @@ button { color: inherit; }
 .queue-download:hover { background: #d9f9e9; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(18, 24, 21, .48); backdrop-filter: blur(5px); }
+.help-modal { width: min(440px, 100%); display: grid; gap: 20px; padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: white; box-shadow: 0 24px 70px rgba(18, 24, 21, .24); }
+.help-modal h2 { margin-top: 5px; font-size: 22px; }
+.help-modal ol { display: grid; gap: 10px; padding-left: 22px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.avatar-button:disabled, .icon-button:disabled { cursor: not-allowed; opacity: .45; }
 .error-page { min-height: 100vh; display: grid; place-items: center; background: var(--canvas); padding: 30px; }
 .error-card { max-width: 430px; background: white; border: 1px solid var(--line); border-radius: 20px; padding: 30px; box-shadow: var(--shadow); }
 .error-card h1 { letter-spacing: -.04em; }
@@ -188,8 +194,7 @@ button { color: inherit; }
   .format-pill { justify-self: start; }
   .dropzone { grid-template-columns: auto 1fr; }
   .browse-button { display: none; }
-  .phrase-row { grid-template-columns: 32px 1fr 30px; }
-  .phrase-row .danger { display: none; }
+  .phrase-row { grid-template-columns: 32px 1fr 30px 30px 30px; }
   .action-bar { bottom: 8px; }
   .action-bar > div { display: none; }
   .primary-button { width: 100%; }

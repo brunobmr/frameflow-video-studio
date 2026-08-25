@@ -30,9 +30,11 @@ export function EditorStudio() {
   const [captions, setCaptions] = useState(approvedLofiSettings.captions);
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [isRendering, setIsRendering] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const outputUrls = useRef<string[]>([]);
   const selectedFile = files[0] ?? null;
   const activePhrase = phrases[activePhraseIndex] ?? "";
+  const firstDownload = jobs.find((job) => job.status === "done" && job.outputUrl);
   const videoUrl = useMemo(
     () => selectedFile ? URL.createObjectURL(selectedFile) : null,
     [selectedFile],
@@ -57,6 +59,10 @@ export function EditorStudio() {
     const nextFiles = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("video/"));
     setFiles(nextFiles);
     setJobs([]);
+  }
+
+  function goToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function prepareVersions() {
@@ -103,18 +109,18 @@ export function EditorStudio() {
         </div>
 
         <div className="top-actions">
-          <button className="ghost-button"><CircleHelp size={17} /> Ajuda</button>
-          <button className="avatar-button" aria-label="Abrir perfil">BM</button>
+          <button type="button" className="ghost-button" onClick={() => setShowHelp(true)}><CircleHelp size={17} /> Ajuda</button>
+          <button type="button" className="avatar-button" aria-label="Perfil de Bruno" title="Perfil será ativado com o login" disabled>BM</button>
         </div>
       </header>
 
       <div className="workspace-grid">
         <aside className="sidebar" aria-label="Navegação do projeto">
           <nav className="step-list" aria-label="Etapas do projeto">
-            <button className="step-item is-active"><span>1</span><UploadCloud size={18} /> Entrada</button>
-            <button className="step-item"><span>2</span><Clapperboard size={18} /> Modelo</button>
-            <button className="step-item"><span>3</span><Captions size={18} /> Texto e legendas</button>
-            <button className="step-item"><span>4</span><Layers3 size={18} /> Variações</button>
+            <button type="button" className="step-item is-active" onClick={() => goToSection("entrada")}><span>1</span><UploadCloud size={18} /> Entrada</button>
+            <button type="button" className="step-item" onClick={() => goToSection("modelo")}><span>2</span><Clapperboard size={18} /> Modelo</button>
+            <button type="button" className="step-item" onClick={() => goToSection("textos")}><span>3</span><Captions size={18} /> Texto e legendas</button>
+            <button type="button" className="step-item" onClick={() => goToSection("variacoes")}><span>4</span><Layers3 size={18} /> Variações</button>
           </nav>
 
           <div className="sidebar-note">
@@ -136,7 +142,7 @@ export function EditorStudio() {
             <div className="format-pill">9:16 · 1080 × 1920</div>
           </div>
 
-          <section className="config-card upload-section">
+          <section className="config-card upload-section" id="entrada">
             <div className="section-title-row">
               <div><span className="section-number">01</span><h2>Vídeos de entrada</h2></div>
               {files.length > 0 && <span className="small-status">{files.length} arquivo{files.length > 1 ? "s" : ""}</span>}
@@ -165,7 +171,7 @@ export function EditorStudio() {
             )}
           </section>
 
-          <section className="config-card">
+          <section className="config-card" id="modelo">
             <div className="section-title-row">
               <div><span className="section-number">02</span><h2>Modelo</h2></div>
               <span className="approved-badge"><Sparkles size={14} /> padrão aprovado</span>
@@ -185,12 +191,7 @@ export function EditorStudio() {
             </button>
           </section>
 
-          <PhraseEditor
-            phrases={phrases}
-            activeIndex={activePhraseIndex}
-            onActiveIndexChange={setActivePhraseIndex}
-            onChange={setPhrases}
-          />
+          <div id="textos"><PhraseEditor phrases={phrases} activeIndex={activePhraseIndex} onActiveIndexChange={setActivePhraseIndex} onChange={setPhrases} /></div>
 
           <section className="config-card compact-card">
             <div className="section-title-row">
@@ -214,7 +215,7 @@ export function EditorStudio() {
             </div>
           </section>
 
-          <div className="action-bar">
+          <div className="action-bar" id="variacoes">
             <div>
               <strong>{versionCount || 0} {versionCount === 1 ? "versão planejada" : "versões planejadas"}</strong>
               <span>{files.length || 0} vídeo{files.length === 1 ? "" : "s"} × {phrases.filter((phrase) => phrase.trim()).length} frase{phrases.filter((phrase) => phrase.trim()).length === 1 ? "" : "s"}</span>
@@ -228,7 +229,11 @@ export function EditorStudio() {
         <aside className="preview-panel" aria-label="Prévia e fila de versões">
           <div className="preview-heading">
             <div><p className="eyebrow">Prévia ao vivo</p><h2>Resultado esperado</h2></div>
-            <button className="icon-button" aria-label="Baixar prévia"><Download size={18} /></button>
+            {firstDownload?.outputUrl ? (
+              <a className="icon-button" aria-label="Baixar primeira versão" href={firstDownload.outputUrl} download={firstDownload.outputName}><Download size={18} /></a>
+            ) : (
+              <button type="button" className="icon-button" aria-label="Download disponível após gerar" title="Gere uma versão para baixar" disabled><Download size={18} /></button>
+            )}
           </div>
 
           <VideoCanvas videoUrl={videoUrl} phrase={activePhrase} captions={captions} />
@@ -248,6 +253,16 @@ export function EditorStudio() {
           <RenderQueue jobs={jobs} />
         </aside>
       </div>
+
+      {showHelp && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowHelp(false)}>
+          <section className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div><p className="eyebrow">Como usar</p><h2 id="help-title">Gere suas versões em quatro passos</h2></div>
+            <ol><li>Selecione um ou mais vídeos.</li><li>Edite, adicione ou duplique as frases.</li><li>Clique em “Gerar versões”.</li><li>Baixe cada resultado na fila.</li></ol>
+            <button type="button" className="primary-button" onClick={() => setShowHelp(false)}>Entendi</button>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
