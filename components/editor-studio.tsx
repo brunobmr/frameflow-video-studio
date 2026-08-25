@@ -36,6 +36,7 @@ export function EditorStudio() {
   const [renderStage, setRenderStage] = useState<"idle" | "extracting" | "transcribing" | "rendering">("idle");
   const [showHelp, setShowHelp] = useState(false);
   const outputUrls = useRef<string[]>([]);
+  const transcriptCache = useRef(new Map<string, TranscriptData>());
   const selectedFile = files[0] ?? null;
   const activePhrase = phrases[activePhraseIndex] ?? "";
   const firstDownload = jobs.find((job) => job.status === "done" && job.outputUrl);
@@ -79,17 +80,25 @@ export function EditorStudio() {
       setRenderStage("transcribing");
       try {
         for (const fileIndex of [...new Set(nextJobs.map((job) => job.fileIndex))]) {
+          const file = files[fileIndex];
+          const cacheKey = `${file.name}:${file.size}:${file.lastModified}`;
+          const cachedTranscript = transcriptCache.current.get(cacheKey);
+          if (cachedTranscript) {
+            transcripts.set(fileIndex, cachedTranscript);
+            continue;
+          }
           setRenderStage("extracting");
-          const audio = await extractAudioForTranscription(files[fileIndex], (progress) => {
+          const audio = await extractAudioForTranscription(file, (progress) => {
             setJobs((current) => current.map((item) => item.fileIndex === fileIndex ? { ...item, progress } : item));
           });
           setRenderStage("transcribing");
           const body = new FormData();
-          body.append("file", audio, `${files[fileIndex].name.replace(/\.[^.]+$/, "")}-audio.webm`);
+          body.append("file", audio, `${file.name.replace(/\.[^.]+$/, "")}-audio.webm`);
           const response = await fetch("/api/transcribe", { method: "POST", body });
           const data = await response.json() as TranscriptData & { error?: string };
           if (!response.ok) throw new Error(data.error ?? "Não foi possível gerar as legendas.");
           transcripts.set(fileIndex, data);
+          transcriptCache.current.set(cacheKey, data);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha na transcrição.";
@@ -239,7 +248,7 @@ export function EditorStudio() {
 
             <div className="setting-list">
               <label className="toggle-row">
-                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Português · duas linhas · incluídas no download</small></span></div>
+                <div><Captions size={18} /><span><strong>Legendas automáticas</strong><small>Transcritas uma vez por vídeo e reutilizadas em todas as versões</small></span></div>
                 <input type="checkbox" checked={captions} onChange={(event) => setCaptions(event.target.checked)} />
               </label>
               <label className="toggle-row">

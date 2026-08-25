@@ -39,6 +39,10 @@ function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: num
   return lines;
 }
 
+function instagramClassicFont() {
+  return getComputedStyle(document.body).getPropertyValue("--font-instagram-classic").trim() || "Arial, sans-serif";
+}
+
 function drawCaption(context: CanvasRenderingContext2D, cue?: CaptionCue) {
   if (!cue) return;
   const { width, height } = context.canvas;
@@ -80,7 +84,7 @@ function drawFrame(context: CanvasRenderingContext2D, video: HTMLVideoElement, p
   let fontSize = approvedLofiSettings.headlineFontSize;
   let lines: string[] = [];
   do {
-    context.font = `700 ${fontSize}px "Helvetica Neue", Arial, Helvetica, sans-serif`;
+    context.font = `700 ${fontSize}px ${instagramClassicFont()}`;
     lines = wrapText(context, phrase, maxTextWidth - 56);
     if (lines.length > 3) fontSize -= 2;
   } while (lines.length > 3 && fontSize > 38);
@@ -165,22 +169,27 @@ export async function renderVideoVariant(
   video.muted = true;
   try {
     await waitForEvent(video, "loadedmetadata");
+    await document.fonts.ready;
     const canvas = document.createElement("canvas");
     canvas.width = approvedLofiSettings.outputWidth;
     canvas.height = approvedLofiSettings.outputHeight;
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) throw new Error("Não foi possível preparar a renderização.");
-    const canvasStream = canvas.captureStream(30);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
     await video.play();
+    const capture = video.captureStream ?? video.mozCaptureStream;
+    if (!capture) throw new Error("Use Chrome ou Edge atualizado para exportar.");
+    const sourceStream = capture.call(video);
+    const sourceFrameRate = sourceStream.getVideoTracks()[0]?.getSettings().frameRate ?? 30;
+    const outputFrameRate = Math.max(30, Math.min(60, Math.round(sourceFrameRate)));
+    const canvasStream = canvas.captureStream(outputFrameRate);
     if (options.preserveAudio) {
-      const capture = video.captureStream ?? video.mozCaptureStream;
-      if (!capture) throw new Error("Use Chrome ou Edge atualizado para preservar o áudio.");
-      const sourceStream = capture.call(video);
       sourceStream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
     }
     const mimeType = supportedMimeType();
     const recorder = new MediaRecorder(canvasStream, {
-      ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 192_000,
+      ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: 20_000_000, audioBitsPerSecond: 256_000,
     });
     const chunks: BlobPart[] = [];
     recorder.addEventListener("dataavailable", (event) => { if (event.data.size) chunks.push(event.data); });
